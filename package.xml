@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<package format="1" xmlns="https://wiki.freecad.org/Package_Metadata">
+    <name>KLE2Sketch Workbench</name>
+    <description>Convert your KLE output to a plate sketch in FreeCAD.</description>
+    <version>0.0.1</version>
+    <date>2025-12-03</date>
+    <maintainer>SilvinoR</maintainer>
+    <license file="LICENSE">GPL-2.0-or-later</license>
+    <url type="repository" branch="master">https://github.com/silvinor/tba</url>
+    <url type="readme">https://github.com/silvinor/tba/README.md</url>
+    <icon>Icons/FNLogo.svg</icon>
+    <content>
+        <workbench>
+            <classname>KLE2SketchWorkbench</classname>
+            <subdirectory>./</subdirectory>
+            <tag>kle2sketch</tag>
+        </workbench>
+    </content>
+
+</package>
