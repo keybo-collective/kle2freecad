@@ -5,11 +5,10 @@ import os
 
 import FreeCAD
 import FreeCADGui
-import Part
-import Sketcher
 from PySide2 import QtWidgets, QtGui, QtCore
 from KSutils import debug_print_tree, iconPath
 from kle_json_cleaner import postParse, preParse, countCols, countRows
+from KSdraw import drawFrame
 
 Qt = QtCore.Qt
 _ICON_PATH = os.path.join(iconPath, "kle2sketch.svg")
@@ -177,48 +176,21 @@ class KLEPromptDialog(QtWidgets.QDialog):
         if doc is None:
             doc = FreeCAD.newDocument("KLE_Plate")
 
+        full_w = col_count * adv_w
+        full_h = row_count * adv_h
+
+
+        doc = FreeCAD.ActiveDocument
+        if doc is None:
+            doc = FreeCAD.newDocument("KLE_Plate")
+
         sketch = doc.addObject("Sketcher::SketchObject", "Sketch.")
         xy_plane = doc.getObject("XY_Plane")
         if xy_plane is not None:
             sketch.AttachmentSupport = [(xy_plane, "")]
         sketch.MapMode = 'FlatFace'
 
-        full_w = col_count * adv_w
-        full_h = row_count * adv_h
-
-        p_vec = FreeCAD.Vector(full_w/-2, full_h/2, 0)
-
-        pnt_1 = Part.Point(p_vec)
-        sketch.addGeometry(pnt_1, False)
-        dx_idx = sketch.addConstraint(Sketcher.Constraint('DistanceX', -1, 1, 0, 1, full_w))
-        dy_idx = sketch.addConstraint(Sketcher.Constraint('DistanceY', -1, 1, 0, 1, full_h))
-        sketch.setDatum(dx_idx, FreeCAD.Units.Quantity(f"{(full_w/-2):.6f} mm"))
-        sketch.setDatum(dy_idx, FreeCAD.Units.Quantity(f"{(full_h/2):.6f} mm"))
-
-        ln1 = Part.LineSegment(p_vec, FreeCAD.Vector(p_vec.x + full_w, p_vec.y, 0))
-        ln1_idx = sketch.addGeometry(ln1, False)
-        sketch.addConstraint(Sketcher.Constraint('Coincident', ln1_idx, 1, 0, 1))
-        sketch.addConstraint(Sketcher.Constraint('Horizontal', ln1_idx))
-        len1_idx = sketch.addConstraint(Sketcher.Constraint('DistanceX', ln1_idx, 1, ln1_idx, 2, full_w))
-        sketch.setDatum(len1_idx, FreeCAD.Units.Quantity(f"{full_w:.6f} mm"))
-
-        ln2 = Part.LineSegment(FreeCAD.Vector(full_w/2, full_h/2, 0), FreeCAD.Vector(full_w/2, full_h/-2, 0))
-        ln2_idx = sketch.addGeometry(ln2, False)
-        len2_idx = sketch.addConstraint(Sketcher.Constraint('DistanceY', ln2_idx, 2, ln2_idx, 1, full_h))
-        sketch.setDatum(len2_idx, FreeCAD.Units.Quantity(f"{full_h:.6f} mm"))
-        sketch.addConstraint(Sketcher.Constraint('Coincident', ln2_idx, 1, ln1_idx, 2))
-        sketch.addConstraint(Sketcher.Constraint('Perpendicular', ln1_idx, ln2_idx))
-
-        ln3 = Part.LineSegment(FreeCAD.Vector(full_w/2, full_h/-2, 0), FreeCAD.Vector(full_w/-2, full_h/-2, 0))
-        ln3_idx = sketch.addGeometry(ln3, False)
-        sketch.addConstraint(Sketcher.Constraint('Coincident', ln3_idx, 1, ln2_idx, 2))
-        sketch.addConstraint(Sketcher.Constraint('Parallel', ln3_idx, ln1_idx))
-
-        ln4 = Part.LineSegment(FreeCAD.Vector(full_w/-2, full_h/-2, 0), FreeCAD.Vector(full_w/-2, full_h/2, 0))
-        ln4_idx = sketch.addGeometry(ln4, False)
-        sketch.addConstraint(Sketcher.Constraint('Coincident', ln4_idx, 1, ln3_idx, 2))
-        sketch.addConstraint(Sketcher.Constraint('Coincident', ln4_idx, 2, ln1_idx, 1))
-        sketch.addConstraint(Sketcher.Constraint('Parallel', ln4_idx, ln2_idx))
+        home_pnt = drawFrame(sketch, full_w, full_h)
 
         doc.recompute()
 
