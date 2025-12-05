@@ -243,7 +243,7 @@ def postParse(data):
     return data
 
 
-def count_rows(obj):
+def countRows(obj):
     """Return the max y-coordinate plus height across all keys in the layout."""
     if not isinstance(obj, list):
         return 0
@@ -259,7 +259,7 @@ def count_rows(obj):
     return max_y
 
 
-def count_cols(obj):
+def countCols(obj):
     """Return the max x-coordinate plus width across all keys in the layout."""
     if not isinstance(obj, list):
         return 0

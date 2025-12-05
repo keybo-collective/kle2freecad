@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
 
+import json
 import os
-import inspect
 
 import FreeCAD
 import FreeCADGui
 import Part
 import Sketcher
 from PySide2 import QtWidgets, QtGui, QtCore
-from KSutils import iconPath
+from KSutils import debug_print_tree, iconPath
+from kle_json_cleaner import postParse, preParse, countCols, countRows
 
 Qt = QtCore.Qt
 _ICON_PATH = os.path.join(iconPath, "kle2sketch.svg")
@@ -63,6 +64,7 @@ class KLEPromptDialog(QtWidgets.QDialog):
 
         self.kle_text = _TabFriendlyTextEdit()
         self.kle_text.setPlaceholderText("Paste KLE JSON...")
+        self.kle_text.setPlainText('["A","B","C"],\n["D","E","F"]')
         self.kle_text.setMinimumHeight(140)
 
         v.addWidget(hint)
@@ -78,7 +80,7 @@ class KLEPromptDialog(QtWidgets.QDialog):
         form.setLabelAlignment(QtCore.Qt.AlignLeft)
 
         self.cutout_type = QtWidgets.QComboBox()
-        ## TODO : Add suport for other cutout types
+        ## TODO : Add support for other cutout types
         self.cutout_type.addItem("Cherry MX Basic")
         self.cutout_type.setEnabled(False)
         form.addRow("Switch Cutout Type", self.cutout_type)
@@ -90,7 +92,7 @@ class KLEPromptDialog(QtWidgets.QDialog):
         form.addRow("Stabilizer Cutout Type", self.cutout_stab)
 
         self.cutout_acst = QtWidgets.QComboBox()
-        ## TODO: Add supprt for other Acoustic Cutout types
+        ## TODO: Add support for other Acoustic Cutout types
         self.cutout_acst.addItem("None")
         self.cutout_acst.setEnabled(False)
         form.addRow("Acoustic Cutout Type", self.cutout_acst)
@@ -160,6 +162,16 @@ class KLEPromptDialog(QtWidgets.QDialog):
         adv_w = self.adv_w.value()
         adv_h = self.adv_h.value()
 
+        kle_text = self.kle_text.toPlainText()
+        kle_payload = preParse(kle_text)
+        kle_json = json.loads(kle_payload)
+        kle_parsed = postParse(kle_json)
+        row_count = countRows(kle_parsed)
+        col_count = countCols(kle_parsed)
+
+        # FIXME : remove debug info
+        debug_print_tree(kle_parsed)
+        print(f"rows = {row_count}, cols = {col_count}")
 
         doc = FreeCAD.ActiveDocument
         if doc is None:
@@ -171,21 +183,42 @@ class KLEPromptDialog(QtWidgets.QDialog):
             sketch.AttachmentSupport = [(xy_plane, "")]
         sketch.MapMode = 'FlatFace'
 
-        p_vec = FreeCAD.Vector(adv_w/-2, adv_h/2, 0)
-        p = Part.Point(p_vec)
-        sketch.addGeometry(p, False)
+        full_w = col_count * adv_w
+        full_h = row_count * adv_h
 
-        dx_idx = sketch.addConstraint(Sketcher.Constraint('DistanceX', -1, 1, 0, 1, adv_w))
-        dy_idx = sketch.addConstraint(Sketcher.Constraint('DistanceY', -1, 1, 0, 1, adv_h))
-        sketch.setDatum(dx_idx, FreeCAD.Units.Quantity(f"{(adv_w/-2):.6f} mm"))
-        sketch.setDatum(dy_idx, FreeCAD.Units.Quantity(f"{(adv_h/2):.6f} mm"))
+        p_vec = FreeCAD.Vector(full_w/-2, full_h/2, 0)
 
-        line = Part.LineSegment(p_vec, FreeCAD.Vector(p_vec.x + adv_w, p_vec.y, 0))
-        line_idx = sketch.addGeometry(line, False)
-        sketch.addConstraint(Sketcher.Constraint('Coincident', line_idx, 1, 0, 1))
-        sketch.addConstraint(Sketcher.Constraint('Horizontal', line_idx))
-        length_idx = sketch.addConstraint(Sketcher.Constraint('DistanceX', line_idx, 1, line_idx, 2, adv_w))
-        sketch.setDatum(length_idx, FreeCAD.Units.Quantity(f"{adv_w:.6f} mm"))
+        pnt_1 = Part.Point(p_vec)
+        sketch.addGeometry(pnt_1, False)
+        dx_idx = sketch.addConstraint(Sketcher.Constraint('DistanceX', -1, 1, 0, 1, full_w))
+        dy_idx = sketch.addConstraint(Sketcher.Constraint('DistanceY', -1, 1, 0, 1, full_h))
+        sketch.setDatum(dx_idx, FreeCAD.Units.Quantity(f"{(full_w/-2):.6f} mm"))
+        sketch.setDatum(dy_idx, FreeCAD.Units.Quantity(f"{(full_h/2):.6f} mm"))
+
+        ln1 = Part.LineSegment(p_vec, FreeCAD.Vector(p_vec.x + full_w, p_vec.y, 0))
+        ln1_idx = sketch.addGeometry(ln1, False)
+        sketch.addConstraint(Sketcher.Constraint('Coincident', ln1_idx, 1, 0, 1))
+        sketch.addConstraint(Sketcher.Constraint('Horizontal', ln1_idx))
+        len1_idx = sketch.addConstraint(Sketcher.Constraint('DistanceX', ln1_idx, 1, ln1_idx, 2, full_w))
+        sketch.setDatum(len1_idx, FreeCAD.Units.Quantity(f"{full_w:.6f} mm"))
+
+        ln2 = Part.LineSegment(FreeCAD.Vector(full_w/2, full_h/2, 0), FreeCAD.Vector(full_w/2, full_h/-2, 0))
+        ln2_idx = sketch.addGeometry(ln2, False)
+        len2_idx = sketch.addConstraint(Sketcher.Constraint('DistanceY', ln2_idx, 2, ln2_idx, 1, full_h))
+        sketch.setDatum(len2_idx, FreeCAD.Units.Quantity(f"{full_h:.6f} mm"))
+        sketch.addConstraint(Sketcher.Constraint('Coincident', ln2_idx, 1, ln1_idx, 2))
+        sketch.addConstraint(Sketcher.Constraint('Perpendicular', ln1_idx, ln2_idx))
+
+        ln3 = Part.LineSegment(FreeCAD.Vector(full_w/2, full_h/-2, 0), FreeCAD.Vector(full_w/-2, full_h/-2, 0))
+        ln3_idx = sketch.addGeometry(ln3, False)
+        sketch.addConstraint(Sketcher.Constraint('Coincident', ln3_idx, 1, ln2_idx, 2))
+        sketch.addConstraint(Sketcher.Constraint('Parallel', ln3_idx, ln1_idx))
+
+        ln4 = Part.LineSegment(FreeCAD.Vector(full_w/-2, full_h/-2, 0), FreeCAD.Vector(full_w/-2, full_h/2, 0))
+        ln4_idx = sketch.addGeometry(ln4, False)
+        sketch.addConstraint(Sketcher.Constraint('Coincident', ln4_idx, 1, ln3_idx, 2))
+        sketch.addConstraint(Sketcher.Constraint('Coincident', ln4_idx, 2, ln1_idx, 1))
+        sketch.addConstraint(Sketcher.Constraint('Parallel', ln4_idx, ln2_idx))
 
         doc.recompute()
 
