@@ -1,5 +1,8 @@
+# -*- coding: utf-8 -*-
+
 _IDENTIFIER_CHARS = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-")
 
+# ............................................................................
 
 def _ensure_bounding_array(raw: str) -> str:
     """Add a top-level [] wrapper when missing."""
@@ -47,6 +50,7 @@ def _ensure_bounding_array(raw: str) -> str:
 
     return f"[{raw}]"
 
+# ----------------------------------------------------------------------------
 
 def preParse(raw: str) -> str:
     """
@@ -155,6 +159,8 @@ def preParse(raw: str) -> str:
 
     return "".join(out)
 
+# ----------------------------------------------------------------------------
+
 def postParse(data):
     """
     Normalize a 2D array-like structure so second-level string entries become dicts with key `_v`.
@@ -242,6 +248,7 @@ def postParse(data):
 
     return data
 
+# ----------------------------------------------------------------------------
 
 def countRows(obj):
     """Return the max y-coordinate plus height across all keys in the layout."""
@@ -258,6 +265,7 @@ def countRows(obj):
                     max_y = e
     return max_y
 
+# ----------------------------------------------------------------------------
 
 def countCols(obj):
     """Return the max x-coordinate plus width across all keys in the layout."""

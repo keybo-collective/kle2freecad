@@ -5,10 +5,12 @@ import os
 
 import FreeCAD
 import FreeCADGui
+import Part # FIXME : debug
+import Sketcher
 from PySide2 import QtWidgets, QtGui, QtCore
-from KSutils import debug_print_tree, iconPath
 from kle_json_cleaner import postParse, preParse, countCols, countRows
-from KSdraw import drawFrame
+from KSutils import debug_print_tree, iconPath
+from KSdraw import drawFrame, drawAndGetKeyCenters, drawCherryKey
 
 Qt = QtCore.Qt
 _ICON_PATH = os.path.join(iconPath, "kle2sketch.svg")
@@ -63,7 +65,10 @@ class KLEPromptDialog(QtWidgets.QDialog):
 
         self.kle_text = _TabFriendlyTextEdit()
         self.kle_text.setPlaceholderText("Paste KLE JSON...")
-        self.kle_text.setPlainText('["A","B","C"],\n["D","E","F"]')
+        # FIXME : remove debug data
+        self.kle_text.setPlainText('["A","B","C"],\n["D","E","F"]') # !! DEBUG
+        # self.kle_text.setPlainText('["A","B","C"],["D",{w:2},"E",{x:-2,w:2,_rs:180},"F"]') # !! DEBUG
+        # self.kle_text.setPlainText('["A","B","C","D","E","F","G"],["","","","","","","","","",""]') # !! DEBUG
         self.kle_text.setMinimumHeight(140)
 
         v.addWidget(hint)
@@ -133,7 +138,7 @@ class KLEPromptDialog(QtWidgets.QDialog):
         self.adv_h = self._make_spin(19.05)
         form.addRow("Unit Height", self.adv_h)
 
-        self.adv_k = self._make_spin(0)
+        self.adv_k = self._make_spin(0, enabled=False)
         form.addRow("Kerf", self.adv_k)
 
         v.addLayout(form)
@@ -160,6 +165,9 @@ class KLEPromptDialog(QtWidgets.QDialog):
     def _handle_ok(self):
         adv_w = self.adv_w.value()
         adv_h = self.adv_h.value()
+        adv_k = self.adv_k.value() # Kerf
+        flt_r = self.fillet_rad.value() # Switch fillet radius
+        # flt_c = self.fillet_cut.value() # Stab fillet radius
 
         kle_text = self.kle_text.toPlainText()
         kle_payload = preParse(kle_text)
@@ -168,9 +176,9 @@ class KLEPromptDialog(QtWidgets.QDialog):
         row_count = countRows(kle_parsed)
         col_count = countCols(kle_parsed)
 
-        # FIXME : remove debug info
-        debug_print_tree(kle_parsed)
-        print(f"rows = {row_count}, cols = {col_count}")
+        # # FIXME : remove debug info
+        # debug_print_tree(kle_parsed)
+        # print(f"rows = {row_count}, cols = {col_count}")
 
         doc = FreeCAD.ActiveDocument
         if doc is None:
@@ -190,7 +198,21 @@ class KLEPromptDialog(QtWidgets.QDialog):
             sketch.AttachmentSupport = [(xy_plane, "")]
         sketch.MapMode = 'FlatFace'
 
-        home_pnt = drawFrame(sketch, full_w, full_h)
+        # home_pnt_idx = drawFrame(sketch, full_w, full_h)
+        # home_pnt_idx = sketch.addGeometry(Part.Point(FreeCAD.Vector(0,0,0)), True) # FIXME : debug
+        # sketch.addConstraint(Sketcher.Constraint('Coincident', home_pnt_idx, 1, -1, 1)) # FIXME : debug
+
+        kle_centers = drawAndGetKeyCenters(sketch, kle_parsed, adv_w, adv_h)
+
+
+        debug_print_tree(kle_centers) # FIXME : debug
+
+        for center_idx in kle_centers:
+            print("Calling ", center_idx)
+            drawCherryKey(sketch, center_idx, flt_r, adv_k)
+
+        # drawCherryKey(sketch, 2, flt_r, adv_k)
+
 
         doc.recompute()
 
