@@ -198,7 +198,7 @@ class KLEPromptDialog(QtWidgets.QDialog):
             sketch.AttachmentSupport = [(xy_plane, "")]
         sketch.MapMode = 'FlatFace'
 
-        # home_pnt_idx = drawFrame(sketch, full_w, full_h)
+        home_pnt_idx = drawFrame(sketch, full_w, full_h)
         # home_pnt_idx = sketch.addGeometry(Part.Point(FreeCAD.Vector(0,0,0)), True) # FIXME : debug
         # sketch.addConstraint(Sketcher.Constraint('Coincident', home_pnt_idx, 1, -1, 1)) # FIXME : debug
 
@@ -212,7 +212,6 @@ class KLEPromptDialog(QtWidgets.QDialog):
             drawCherryKey(sketch, center_idx, flt_r, adv_k)
 
         # drawCherryKey(sketch, 2, flt_r, adv_k)
-
 
         doc.recompute()
 
