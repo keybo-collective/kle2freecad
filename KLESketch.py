@@ -8,9 +8,11 @@ import FreeCADGui
 import Part # FIXME : debug
 import Sketcher
 from PySide2 import QtWidgets, QtGui, QtCore
-from kle_json_cleaner import postParse, preParse, countCols, countRows
-from KSutils import debug_print_tree, iconPath
+from kle_json_cleaner import sanitizeAsJson, normalizeKLEData, countCols, countRows
+from KSutils import iconPath
+from KSprefs import get_saved_layout, set_saved_layout
 from KSdraw import drawFrame, drawAndGetKeyCenters, drawCherryKey
+from KSdebug import debug_print_tree # FIXME : debug only
 
 Qt = QtCore.Qt
 _ICON_PATH = os.path.join(iconPath, "kle2sketch.svg")
@@ -64,11 +66,11 @@ class KLEPromptDialog(QtWidgets.QDialog):
         # hint.setStyleSheet("color: #666;")
 
         self.kle_text = _TabFriendlyTextEdit()
+        self.kle_text.setFont(QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.FixedFont))
         self.kle_text.setPlaceholderText("Paste KLE JSON...")
-        # FIXME : remove debug data
-        self.kle_text.setPlainText('["A","B","C"],\n["D","E","F"]') # !! DEBUG
-        # self.kle_text.setPlainText('["A","B","C"],["D",{w:2},"E",{x:-2,w:2,_rs:180},"F"]') # !! DEBUG
-        # self.kle_text.setPlainText('["A","B","C","D","E","F","G"],["","","","","","","","","",""]') # !! DEBUG
+        default_layout = get_saved_layout()
+        if default_layout:
+            self.kle_text.setPlainText(default_layout)
         self.kle_text.setMinimumHeight(140)
 
         v.addWidget(hint)
@@ -170,15 +172,23 @@ class KLEPromptDialog(QtWidgets.QDialog):
         # flt_c = self.fillet_cut.value() # Stab fillet radius
 
         kle_text = self.kle_text.toPlainText()
-        kle_payload = preParse(kle_text)
-        kle_json = json.loads(kle_payload)
-        kle_parsed = postParse(kle_json)
+
+        try:
+            kle_payload = sanitizeAsJson(kle_text)
+            kle_json = json.loads(kle_payload)
+            kle_parsed = normalizeKLEData(kle_json)
+        except Exception as exc:
+            QtWidgets.QMessageBox.critical(self, "Invalid KLE data", str(exc) or "Failed to parse KLE input.")
+            return
+
+        # All good, lets carry on
+        set_saved_layout(kle_text)
         row_count = countRows(kle_parsed)
         col_count = countCols(kle_parsed)
 
-        # # FIXME : remove debug info
-        # debug_print_tree(kle_parsed)
-        # print(f"rows = {row_count}, cols = {col_count}")
+        # FIXME : remove debug info
+        debug_print_tree(kle_parsed)
+        print(f"rows = {row_count}, cols = {col_count}")
 
         doc = FreeCAD.ActiveDocument
         if doc is None:
@@ -186,7 +196,6 @@ class KLEPromptDialog(QtWidgets.QDialog):
 
         full_w = col_count * adv_w
         full_h = row_count * adv_h
-
 
         doc = FreeCAD.ActiveDocument
         if doc is None:
@@ -199,20 +208,24 @@ class KLEPromptDialog(QtWidgets.QDialog):
         sketch.MapMode = 'FlatFace'
 
         home_pnt_idx = drawFrame(sketch, full_w, full_h)
-        # home_pnt_idx = sketch.addGeometry(Part.Point(FreeCAD.Vector(0,0,0)), True) # FIXME : debug
-        # sketch.addConstraint(Sketcher.Constraint('Coincident', home_pnt_idx, 1, -1, 1)) # FIXME : debug
+        doc.recompute()
 
         kle_centers = drawAndGetKeyCenters(sketch, kle_parsed, adv_w, adv_h)
+        doc.recompute()
 
+        progress = QtWidgets.QProgressDialog("Drawing key cutouts...", None, 0, len(kle_centers), self)
+        progress.setWindowTitle("KLE Sketch Generator")
+        progress.setCancelButton(None)
+        progress.setMinimumDuration(0)
+        progress.setWindowModality(Qt.WindowModal)
+        progress.forceShow()
 
-        debug_print_tree(kle_centers) # FIXME : debug
-
-        for center_idx in kle_centers:
-            print("Calling ", center_idx)
-            drawCherryKey(sketch, center_idx, flt_r, adv_k)
-
-        # drawCherryKey(sketch, 2, flt_r, adv_k)
-
+        for step, idx in enumerate(kle_centers, start=1):
+            drawCherryKey(sketch, idx, flt_r, adv_k)
+            progress.setValue(step)
+            QtWidgets.QApplication.processEvents(QtCore.QEventLoop.ExcludeUserInputEvents)
+        progress.close()
+        # drawCherryKey(sketch, 5, flt_r, adv_k)
         doc.recompute()
 
         try:
@@ -228,7 +241,7 @@ class KLESketchGeneratorCommand:
     def GetResources(self):
         return {
             "Pixmap": _ICON_PATH,
-            "MenuText": "KLESketchGenerator",
+            "MenuText": "KLE Sketch Generator",
             "ToolTip": "Generate a sketch from KLE data",
         }
 

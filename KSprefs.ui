@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>KSprefs</class>
+ <widget class="QWidget" name="KSprefs">
+  <property name="windowTitle">
+    <string>General settings</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <property name="spacing">
+    <number>8</number>
+   </property>
+   <property name="margin">
+    <number>9</number>
+   </property>
+   <item>
+    <widget class="QGroupBox" name="kleGroup">
+     <property name="title">
+      <string>KLE DATA</string>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout_2">
+      <property name="spacing">
+       <number>6</number>
+      </property>
+      <item>
+       <widget class="QLabel" name="kleHintLabel">
+        <property name="text">
+         <string>Paste KLE raw data or JSON here</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPlainTextEdit" name="jsonTextEdit">
+        <property name="toolTip">
+         <string>Enter or paste KLE raw output here</string>
+        </property>
+        <property name="placeholderText">
+         <string>Paste KLE layout data here...</string>
+        </property>
+        <property name="lineWrapMode">
+         <enum>QPlainTextEdit::NoWrap</enum>
+        </property>
+        <property name="minimumHeight">
+         <number>160</number>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="kleNoteLabel">
+        <property name="text">
+         <string>This value is overridden by the KLE dialog; edit or clear it here for convenience.</string>
+        </property>
+        <property name="wordWrap">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+import json
+
 _IDENTIFIER_CHARS = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-")
 
 # ............................................................................
@@ -52,15 +54,22 @@ def _ensure_bounding_array(raw: str) -> str:
 
 # ----------------------------------------------------------------------------
 
-def preParse(raw: str) -> str:
+def sanitizeAsJson(raw: str) -> str:
     """
     Convert JSON-like strings with unquoted object keys into valid JSON.
     """
+
+    try:
+        # Fast path: already valid JSON? return as-is.
+        json.loads(raw)
+        return raw
+    except Exception:
+        pass
+
     wrapped = _ensure_bounding_array(raw)
+    rescape_strings = "\\n" not in raw
     out = []
     stack = []
-    in_string = False
-    escape = False
     expecting_key = False
 
     i = 0
@@ -68,21 +77,71 @@ def preParse(raw: str) -> str:
     while i < length:
         ch = wrapped[i]
 
-        if in_string:
-            out.append(ch)
-            if escape:
-                escape = False
-            elif ch == "\\":
-                escape = True
-            elif ch == '"':
-                in_string = False
-            i += 1
-            continue
-
         if ch == '"':
-            in_string = True
-            out.append(ch)
+            if rescape_strings:
+                i += 1
+                buf = []
+                length_minus_one = length - 1
+                while i < length:
+                    ch2 = wrapped[i]
+                    if ch2 == '"':
+                        k = i + 1
+                        while k < length and wrapped[k].isspace():
+                            k += 1
+                        if k > length_minus_one or wrapped[k] in ",]}":
+                            i += 1
+                            break
+                        buf.append(ch2)
+                        i += 1
+                        continue
+                    if ch2 == "\n":
+                        buf.append("\\n")
+                        i += 1
+                        continue
+                    if ch2 == "\r":
+                        buf.append("\\r")
+                        i += 1
+                        continue
+                    if ch2 == "\t":
+                        buf.append("\\t")
+                        i += 1
+                        continue
+                    buf.append(ch2)
+                    i += 1
+                out.append('"')
+                out.append(json.dumps("".join(buf))[1:-1])
+                out.append('"')
+                continue
+
             i += 1
+            out.append('"')
+            escape = False
+            while i < length:
+                ch2 = wrapped[i]
+                if ch2 == "\n":
+                    out.append("\\n")
+                    escape = False
+                    i += 1
+                    continue
+                if ch2 == "\r":
+                    out.append("\\r")
+                    escape = False
+                    i += 1
+                    continue
+                if ch2 == "\t":
+                    out.append("\\t")
+                    escape = False
+                    i += 1
+                    continue
+                out.append(ch2)
+                if escape:
+                    escape = False
+                elif ch2 == "\\":
+                    escape = True
+                elif ch2 == '"':
+                    i += 1
+                    break
+                i += 1
             continue
 
         if ch == "{":
@@ -161,13 +220,23 @@ def preParse(raw: str) -> str:
 
 # ----------------------------------------------------------------------------
 
-def postParse(data):
+def normalizeKLEData(data):
     """
     Normalize a 2D array-like structure so second-level string entries become dicts with key `_v`.
     Assumes `data` is a list of lists; mutates in place for speed and returns the same reference.
     """
 
-    # This loop (1) compounds param pre-values with key values
+    # This loop (1) checks for single row layouts
+    oneDim = False
+    for row in data:
+        if not isinstance(row, list):
+            oneDim = True
+            break
+    if oneDim:
+        flat = list(data)
+        data[:] = [flat]
+
+    # This loop (2) compounds param pre-values with key values
     for row in data:
         if not isinstance(row, list):
             continue
@@ -188,7 +257,7 @@ def postParse(data):
             idx += 1
         row[:] = normalized
 
-    # This loop (2) adjusts all the keys' dimensions
+    # This loop (3) adjusts all the keys' dimensions
     oy = -1 # origin Y
     g_state = False # Ghost state
     d_state = False # Decal state
@@ -201,7 +270,7 @@ def postParse(data):
             if not isinstance(item, dict):
                 continue # already cleaned out in loop 1, but just in case
             normalized_item = {
-                # "v": item.get("v", ""), # don't need this, but helpful in debug
+                "v": item.get("v", ""), # don't need this, but helpful in debug
                 "w": item.get("w", 1),
                 "h": item.get("h", 1),
                 "x": item.get("x", 0),

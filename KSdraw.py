@@ -5,7 +5,7 @@ import Part
 import Sketcher
 import math
 from kle_json_cleaner import countCols, countRows
-from KSutils import debug_print_tree
+from KSdebug import debug_print_tree # FIXME : debug only
 
 # ----------------------------------------------------------------------------
 
@@ -83,8 +83,6 @@ def drawAndGetKeyCenters(sketch, kle_clean, m_w, m_h):
 
     return geom_indices
 
-# ----------------------------------------------------------------------------
-
 def drawCherryKey(sketch, home_pnt_idx, flt_r, kerf):
     """Draws a 14x14 plate cutout"""
 
@@ -111,48 +109,30 @@ def drawCherryKey(sketch, home_pnt_idx, flt_r, kerf):
     i_top = top - flt_r
     i_btm = btm + flt_r
 
-    print(home_pnt, home_pnt.X, home_pnt.Y, lft, rte, top, btm, i_lft, i_rte, i_top, i_btm)
+    # Batch geometry/constraints to reduce per-call overhead when creating many keys.
+    geoms = [
+        Part.LineSegment(FreeCAD.Vector(i_lft, top, 0), FreeCAD.Vector(i_rte, top, 0)),
+        Part.ArcOfCircle(Part.Circle(FreeCAD.Vector(i_rte, i_top, 0), FreeCAD.Vector(0, 0, 1), flt_r), 0.0, 1.5708),
+        Part.LineSegment(FreeCAD.Vector(rte, i_top, 0), FreeCAD.Vector(rte, i_btm, 0)),
+        Part.ArcOfCircle(Part.Circle(FreeCAD.Vector(i_rte, i_btm, 0), FreeCAD.Vector(0, 0, 1), flt_r), 4.7124, 6.28319),
+        Part.LineSegment(FreeCAD.Vector(i_rte, btm, 0), FreeCAD.Vector(i_lft, btm, 0)),
+        Part.ArcOfCircle(Part.Circle(FreeCAD.Vector(i_lft, i_btm, 0), FreeCAD.Vector(0, 0, 1), flt_r), 3.1416, 4.7124),
+        Part.LineSegment(FreeCAD.Vector(lft, i_btm, 0), FreeCAD.Vector(lft, i_top, 0)),
+        Part.ArcOfCircle(Part.Circle(FreeCAD.Vector(i_lft, i_top, 0), FreeCAD.Vector(0, 0, 1), flt_r), 1.5708, 3.1416),
+    ]
+    geom_indices = sketch.addGeometry(geoms, False)
 
-    # return True # FIXME : debug
-
-    geom_indices = []
-
-    # ----- Geometries -----
-
-    # [0] top edge
-    geom_indices.append(sketch.addGeometry(Part.LineSegment(FreeCAD.Vector(i_lft, top, 0), FreeCAD.Vector(i_rte, top, 0)), False))
-    # [1] top right arc
-    geom_indices.append(sketch.addGeometry(Part.ArcOfCircle(Part.Circle(FreeCAD.Vector(i_rte, i_top, 0), FreeCAD.Vector(0, 0, 1), flt_r), 0.0, 1.5708)))
-    # [2] right edge
-    geom_indices.append(sketch.addGeometry(Part.LineSegment(FreeCAD.Vector(rte, i_top, 0), FreeCAD.Vector(rte, i_btm, 0)), False))
-    # [3] bottom right arc
-    geom_indices.append(sketch.addGeometry(Part.ArcOfCircle(Part.Circle(FreeCAD.Vector(i_rte, i_btm, 0), FreeCAD.Vector(0, 0, 1), flt_r), 4.7124, 6.28319)))
-    # [4] bottom edge
-    geom_indices.append(sketch.addGeometry(Part.LineSegment(FreeCAD.Vector(i_rte, btm, 0), FreeCAD.Vector(i_lft, btm, 0)), False))
-    # [5] bottom left arc
-    geom_indices.append(sketch.addGeometry(Part.ArcOfCircle(Part.Circle(FreeCAD.Vector(i_lft, i_btm, 0), FreeCAD.Vector(0, 0, 1), flt_r), 3.1416, 4.7124)))
-    # [6] left edge
-    geom_indices.append(sketch.addGeometry(Part.LineSegment(FreeCAD.Vector(lft, i_btm, 0), FreeCAD.Vector(lft, i_top, 0)), False))
-    # [7] top left arc
-    geom_indices.append(sketch.addGeometry(Part.ArcOfCircle(Part.Circle(FreeCAD.Vector(i_lft, i_top, 0), FreeCAD.Vector(0, 0, 1), flt_r), 1.5708, 3.1416)))
-
-    # ----- Constraints -----
-
-    """
-    We're not doing anything special here, first we Coincident all the ends, then we lock em all.
-    When we first place the lines and arcs the coordinates should be correct, so no need to do any datum constraints.
-    """
-    sketch.addConstraint(Sketcher.Constraint('Coincident', geom_indices[0], 2, geom_indices[1], 2))
-    sketch.addConstraint(Sketcher.Constraint('Coincident', geom_indices[1], 1, geom_indices[2], 1))
-    sketch.addConstraint(Sketcher.Constraint('Coincident', geom_indices[2], 2, geom_indices[3], 2))
-    sketch.addConstraint(Sketcher.Constraint('Coincident', geom_indices[3], 1, geom_indices[4], 1))
-    sketch.addConstraint(Sketcher.Constraint('Coincident', geom_indices[4], 2, geom_indices[5], 2))
-    sketch.addConstraint(Sketcher.Constraint('Coincident', geom_indices[5], 1, geom_indices[6], 1))
-    sketch.addConstraint(Sketcher.Constraint('Coincident', geom_indices[6], 2, geom_indices[7], 2))
-    sketch.addConstraint(Sketcher.Constraint('Coincident', geom_indices[7], 1, geom_indices[0], 1))
-    for j in range(8):
-         sketch.addConstraint(Sketcher.Constraint('Block', geom_indices[j]))
-
-    del geom_indices
+    constraints = [
+        Sketcher.Constraint('Coincident', geom_indices[0], 2, geom_indices[1], 2),
+        Sketcher.Constraint('Coincident', geom_indices[1], 1, geom_indices[2], 1),
+        Sketcher.Constraint('Coincident', geom_indices[2], 2, geom_indices[3], 2),
+        Sketcher.Constraint('Coincident', geom_indices[3], 1, geom_indices[4], 1),
+        Sketcher.Constraint('Coincident', geom_indices[4], 2, geom_indices[5], 2),
+        Sketcher.Constraint('Coincident', geom_indices[5], 1, geom_indices[6], 1),
+        Sketcher.Constraint('Coincident', geom_indices[6], 2, geom_indices[7], 2),
+        Sketcher.Constraint('Coincident', geom_indices[7], 1, geom_indices[0], 1),
+    ]
+    constraints.extend(Sketcher.Constraint('Block', idx) for idx in geom_indices)
+    sketch.addConstraint(constraints)
 
     return True # Success

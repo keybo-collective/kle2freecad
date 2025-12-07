@@ -1,15 +1,14 @@
 # -*- coding: utf-8 -*-
 
-import os
-import sys
-import inspect
-import FreeCAD
-import FreeCADGui
+import inspect, os, sys
+import FreeCAD, FreeCADGui
 
 class KSWorkbench (FreeCADGui.Workbench):
+    """FreeCAD Workbench for the KLE Plate Generator"""
     from KSutils import iconPath
+    from KSprefs import KSprefsPage
 
-    MenuText = "KLE to Sketch"
+    MenuText = "KLE Plate Generator"
     ToolTip = "Convert KLE output to a sketch"
     Icon = os.path.join(iconPath, "kle2sketch.svg")
 
@@ -17,14 +16,16 @@ class KSWorkbench (FreeCADGui.Workbench):
         """This function is executed when the workbench is first activated.
         It is executed once in a FreeCAD session followed by the Activated function.
         """
-        # # Ensure the icon directory is on the search path
-        # FreeCADGui.addIconPath(iconPath)
-
         import KLESketch  # registers commands
 
         self.list = ["KLESketchGenerator"]
-        self.appendToolbar("KLE Transform", self.list)
-        self.appendMenu("KLE Transform", self.list)
+        self.appendToolbar("KLE Plate Generator", self.list)
+        self.appendMenu("KLE Plate Generator", self.list)
+
+        # Ensure the icon directory is on the search path
+        FreeCADGui.addIconPath(self.iconPath)
+
+        FreeCADGui.addPreferencePage(self.KSprefsPage, "KLE Plate Generator")
 
     def Activated(self):
         """This function is executed whenever the workbench is activated"""
