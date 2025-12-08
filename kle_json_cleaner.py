@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import json
+from copy import deepcopy
 
 _IDENTIFIER_CHARS = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-")
 
@@ -233,7 +234,7 @@ def normalizeKLEData(data):
             oneDim = True
             break
     if oneDim:
-        flat = list(data)
+        flat = deepcopy(list(data))
         data[:] = [flat]
 
     # This loop (2) compounds param pre-values with key values
@@ -350,3 +351,18 @@ def countCols(obj):
                 if e > max_x:
                     max_x = e
     return max_x
+
+# ----------------------------------------------------------------------------
+
+def countKeys(obj):
+    """Return the count of all keys in the structure."""
+    if not isinstance(obj, list):
+        return 0
+    count = 0
+    for row in obj:
+        if not isinstance(row, list):
+            continue
+        for item in row:
+            if isinstance(item, dict):
+                count += 1
+    return count

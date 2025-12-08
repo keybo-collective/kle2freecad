@@ -2,17 +2,15 @@
 
 import json
 import os
-
+import traceback
 import FreeCAD
 import FreeCADGui
-import Part # FIXME : debug
 import Sketcher
 from PySide2 import QtWidgets, QtGui, QtCore
-from kle_json_cleaner import sanitizeAsJson, normalizeKLEData, countCols, countRows
+from kle_json_cleaner import sanitizeAsJson, normalizeKLEData, countCols, countRows, countKeys
 from KSutils import iconPath
 from KSprefs import get_saved_layout, set_saved_layout
-from KSdraw import drawFrame, drawAndGetKeyCenters, drawCherryKey
-from KSdebug import debug_print_tree # FIXME : debug only
+from KSdraw import drawFrame, findKeyCenters, drawCenter, drawCherryKey, drawCherryStab
 
 Qt = QtCore.Qt
 _ICON_PATH = os.path.join(iconPath, "kle2sketch.svg")
@@ -165,11 +163,20 @@ class KLEPromptDialog(QtWidgets.QDialog):
         return spin
 
     def _handle_ok(self):
+        for widget in self.findChildren(QtWidgets.QWidget):
+            widget.setVisible(False)
+        layout = self.layout()
+        if layout is not None:
+            wait_label = self._make_hint_label("Generating ... please wait.")
+            wait_label.setAlignment(Qt.AlignCenter)
+            layout.addWidget(wait_label, alignment=Qt.AlignHCenter)
+        QtWidgets.QApplication.processEvents(QtCore.QEventLoop.ExcludeUserInputEvents)
+
         adv_w = self.adv_w.value()
         adv_h = self.adv_h.value()
         adv_k = self.adv_k.value() # Kerf
         flt_r = self.fillet_rad.value() # Switch fillet radius
-        # flt_c = self.fillet_cut.value() # Stab fillet radius
+        flt_c = self.fillet_cut.value() # Stab fillet radius
 
         kle_text = self.kle_text.toPlainText()
 
@@ -185,10 +192,6 @@ class KLEPromptDialog(QtWidgets.QDialog):
         set_saved_layout(kle_text)
         row_count = countRows(kle_parsed)
         col_count = countCols(kle_parsed)
-
-        # FIXME : remove debug info
-        debug_print_tree(kle_parsed)
-        print(f"rows = {row_count}, cols = {col_count}")
 
         doc = FreeCAD.ActiveDocument
         if doc is None:
@@ -210,28 +213,45 @@ class KLEPromptDialog(QtWidgets.QDialog):
         home_pnt_idx = drawFrame(sketch, full_w, full_h)
         doc.recompute()
 
-        kle_centers = drawAndGetKeyCenters(sketch, kle_parsed, adv_w, adv_h)
-        doc.recompute()
+        kle_parsed = findKeyCenters(kle_parsed, adv_w, adv_h)
 
-        progress = QtWidgets.QProgressDialog("Drawing key cutouts...", None, 0, len(kle_centers), self)
+        progress = QtWidgets.QProgressDialog("Drawing key cutouts...", None, 0, countKeys(kle_parsed), self)
         progress.setWindowTitle("KLE Sketch Generator")
         progress.setCancelButton(None)
         progress.setMinimumDuration(0)
         progress.setWindowModality(Qt.WindowModal)
         progress.forceShow()
 
-        for step, idx in enumerate(kle_centers, start=1):
-            drawCherryKey(sketch, idx, flt_r, adv_k)
-            progress.setValue(step)
-            QtWidgets.QApplication.processEvents(QtCore.QEventLoop.ExcludeUserInputEvents)
+        try:
+            step = 0
+            for row in kle_parsed:
+                if not isinstance(row, list):
+                    continue
+                for item in row:
+                    if isinstance(item, dict):
+                        cx = item.get("cx",0)
+                        cy = item.get("cy",0)
+                        # drawCenter(sketch, cx, cy)
+                        drawCherryKey(sketch, cx, cy, flt_r, adv_k)
+                        w = item.get("w",1)
+                        h = item.get("h",1)
+                        if w >= 2 or h >= 2:
+                            drawCherryStab(sketch, cx, cy, w, h, item.get("r",0), flt_c, adv_k)
+                        step += 1
+                    progress.setValue(step)
+                    QtWidgets.QApplication.processEvents(QtCore.QEventLoop.ExcludeUserInputEvents)
+        except Exception as e:
+            print(str(e))
+            traceback.print_exc()
+
         progress.close()
-        # drawCherryKey(sketch, 5, flt_r, adv_k)
         doc.recompute()
 
         try:
             FreeCADGui.ActiveDocument.setEdit(sketch.Name)
         except Exception:
             pass
+
         self.accept()
 
 
