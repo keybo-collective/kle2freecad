@@ -6,7 +6,7 @@ import traceback
 import FreeCAD
 import FreeCADGui
 import Sketcher
-from PySide2 import QtWidgets, QtGui, QtCore
+from PySide6 import QtWidgets, QtGui, QtCore
 from kle_json_cleaner import sanitizeAsJson, normalizeKLEData, countCols, countRows, countKeys
 from KSutils import iconPath
 from KSprefs import get_saved_layout, set_saved_layout

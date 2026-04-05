@@ -2,7 +2,7 @@
 
 import FreeCAD
 import FreeCADGui
-from PySide2 import QtGui
+from PySide6 import QtGui
 from KSutils import prefFileName
 
 _PREF_PATH = "User parameter:BaseApp/Preferences/Mod/kle2sketch"
