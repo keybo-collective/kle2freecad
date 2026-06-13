@@ -36,7 +36,7 @@ git clone https://github.com/keybo-collective/kle2freecad
     ![](docs/screenshot2.jpg)
 - Output from this screen will be a generated sketch of the plate.
 
-- Current Limits
+## Current Limits
 
 - Only generates simple Cherry MX Basic key footprints.
 - Only generates simple Cherry MX Basic stab cutouts (PCB mount).
